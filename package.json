@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "latest",
+    "@google/genai": "*",
     "exifreader": "^4.20.0",
     "lucide-react": "^0.300.0",
     "react": "^18.2.0",
