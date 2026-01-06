@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { runSystemDiagnostics } from './src/lib/diagnostics';
 
 // --- SELF-HEALING SCRIPT ---
 // พี่อุ๊กครับ ส่วนนี้คือ "เงื่อนไขเช็ค Code ตัวเอง" ตามที่พี่สั่งครับ
@@ -14,6 +15,11 @@ try {
 } catch (e) {
   // Ignore errors if DOM is not ready, though this runs after body parse usually
 }
+// ---------------------------
+
+// --- RUN DEBUG PROTOCOL ---
+// รันตรวจสอบระบบทันทีที่โหลด
+runSystemDiagnostics();
 // ---------------------------
 
 const rootElement = document.getElementById('root');
