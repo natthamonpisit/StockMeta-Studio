@@ -1,7 +1,7 @@
 {
   "name": "stock-meta-studio",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "preinstall": "rm -rf package-lock.json",
@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "0.2.1",
+    "@google/genai": "^0.1.2",
     "clsx": "^2.1.0",
     "exifreader": "^4.20.0",
     "lucide-react": "^0.300.0",
