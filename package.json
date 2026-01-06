@@ -1,7 +1,7 @@
 {
   "name": "stock-meta-studio",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "scripts": {
     "preinstall": "rm -rf package-lock.json",
