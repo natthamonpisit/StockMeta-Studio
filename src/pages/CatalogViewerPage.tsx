@@ -30,13 +30,18 @@ const AssetAnalysisHUD = ({ analysis, isLoading }: { analysis?: Analysis, isLoad
   if (score > 80) { scoreColor = 'text-green-500'; }
 
   const risks = analysis.riskFlags;
+  // [UPDATE] Get the first rationale point to display
+  const primaryRationale = analysis.scoreRationale && analysis.scoreRationale.length > 0 
+    ? analysis.scoreRationale[0] 
+    : "No rationale provided.";
   
   return (
     <div className="w-full bg-[#0b0f19] border-b border-border p-3 shadow-md flex flex-col md:flex-row gap-4 md:items-center relative z-20">
       
-      {/* SCORE CIRCLE & LABEL */}
-      <div className="flex items-center gap-3 border-r border-border pr-6 min-w-[180px]">
-        <div className="relative w-10 h-10 flex items-center justify-center">
+      {/* SCORE CIRCLE & RATIONALE */}
+      {/* [UPDATE] Increased min-width to accommodate text and added flex-col layout for text */}
+      <div className="flex items-center gap-3 border-r border-border pr-6 min-w-[280px]">
+        <div className="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
            {/* SVG Circle Progress logic using strokeDasharray */}
            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
               <path className="text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
@@ -44,11 +49,15 @@ const AssetAnalysisHUD = ({ analysis, isLoading }: { analysis?: Analysis, isLoad
            </svg>
            <span className={`absolute text-xs font-bold ${scoreColor}`}>{score}</span>
         </div>
-        <div>
+        <div className="flex flex-col justify-center">
            <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Sell Potential</div>
-           <div className={`text-xs font-bold ${scoreColor}`}>
+           <div className={`text-xs font-bold ${scoreColor} mb-0.5`}>
              {score > 80 ? 'HIGH VALUE' : score > 50 ? 'AVERAGE' : 'POOR'}
            </div>
+           {/* [UPDATE] Added Rationale Text */}
+           <p className="text-[10px] text-slate-400 leading-tight line-clamp-2 max-w-[200px]" title={primaryRationale}>
+              {primaryRationale}
+           </p>
         </div>
       </div>
 
