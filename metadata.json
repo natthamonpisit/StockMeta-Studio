@@ -1,0 +1,5 @@
+{
+  "name": "StockMeta Studio",
+  "description": "MVP stock photo evaluation tool with Lightroom-like UI. Features batch upload, AI analysis simulation, metadata editing, and CSV export.",
+  "requestFramePermissions": []
+}
