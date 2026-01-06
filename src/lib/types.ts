@@ -104,7 +104,12 @@ export interface Analysis {
   keywords: string[];     // Keyword 40 คำ (สำคัญที่สุดในการขาย)
   category: string;
   sellScore: number;      // คะแนนประเมินโอกาสขาย (0-100)
-  scoreRationale: string[]; // เหตุผลที่ให้คะแนนนี้
+  
+  // [UPDATE] Detailed Report breakdown
+  pros: string[];         // ข้อดี 5 ข้อ
+  cons: string[];         // ข้อเสีย 5 ข้อ
+  scoreRationale: string[]; // (Legacy support) Summary rationale
+  
   suggestions: string[];  // คำแนะนำในการแต่งรูปเพิ่ม
   qcWarnings: string[];   // คำเตือนเรื่องคุณภาพ (Noise, Blur)
   riskFlags: RiskFlags;

@@ -15,21 +15,22 @@ export interface StockAnalysisResult {
   keywords: string[];
   category: string;
   sellScore: number;
-  scoreRationale: string[];
+  pros: string[]; // [UPDATE] New field
+  cons: string[]; // [UPDATE] New field
+  scoreRationale?: string[]; // Optional/Derived
   qcWarnings: string[];
-  suggestions: string[]; // mapped from suggested_edits_before_upload
+  suggestions: string[]; 
   riskFlags: RiskFlags;
   composition: CompositionStats;
 }
 
 export const aiService = {
   // --- TRENDS FORECASTING SERVICE ---
-  // ใช้ AI วิเคราะห์ตลาดล่วงหน้า 3 เดือน (Buying Cycle)
   async getStockTrends(customTopic?: string): Promise<TrendItem[]> {
     try {
       const apiKey = process.env.API_KEY;
       
-      // [DEV GUARD] ถ้าไม่มี Key ให้ใช้ Mock Data เพื่อไม่ให้ App พัง
+      // [DEV GUARD]
       if (!apiKey || apiKey === 'dummy-key-for-ui-dev' || apiKey === '') {
         console.warn("No valid API_KEY found. Falling back to simulation mode.");
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -39,7 +40,6 @@ export const aiService = {
       const ai = new GoogleGenAI({ apiKey });
       const today = new Date();
       
-      // Calculate future window (Next 3 Months)
       const monthNames = [];
       for (let i = 1; i <= 3; i++) {
         const d = new Date(today);
@@ -50,7 +50,6 @@ export const aiService = {
       const targetYear = new Date(today.getFullYear(), today.getMonth() + 3).getFullYear();
       const windowString = `${monthNames.join(', ')} ${targetYear}`;
 
-      // [PROMPT ENGINEERING] Persona & Task
       let systemInstruction = "You are the Head of Content Strategy for a top-tier microstock agency.";
       let userPrompt = "";
 
@@ -60,7 +59,6 @@ export const aiService = {
         userPrompt = `MARKET FORECAST: ${windowString}. Generate 9 High-Commercial-Value Stock Trends distributed across these 3 months.`;
       }
 
-      // JSON Schema Enforcement
       const schema = {
         type: Type.ARRAY,
         items: {
@@ -75,7 +73,6 @@ export const aiService = {
         }
       };
 
-      // Improved Trend Fallback: Try Gemini 3 -> Flash Latest
       try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
@@ -83,7 +80,7 @@ export const aiService = {
             config: {
             responseMimeType: "application/json",
             responseSchema: schema,
-            temperature: 0.8, // Creative temperature
+            temperature: 0.8, 
             systemInstruction: systemInstruction
             }
         });
@@ -92,7 +89,6 @@ export const aiService = {
         return JSON.parse(text) as TrendItem[];
       } catch (err) {
         console.debug("Gemini 3 Trends failed, falling back to Flash Latest...");
-        // Fallback Logic
         const response = await ai.models.generateContent({
             model: "gemini-flash-latest", 
             contents: userPrompt,
@@ -115,20 +111,17 @@ export const aiService = {
   },
 
   // --- IMAGE GENERATION (VISUALIZATION) ---
-  // ใช้ Gemini 2.5 Flash Image เพื่อสร้างภาพตัวอย่างของ Trend
   async generateImage(prompt: string): Promise<string | null> {
     try {
       const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === 'dummy-key-for-ui-dev' || apiKey === '') {
-        return null;
-      }
+      if (!apiKey || apiKey === 'dummy-key-for-ui-dev' || apiKey === '') return null;
+      
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: prompt + " high quality stock photography, 8k" }] },
         config: { imageConfig: { aspectRatio: "4:3" } }
       });
-      // Extract Base64 from response
       if (response.candidates?.[0]?.content?.parts) {
         for (const part of response.candidates[0].content.parts) {
           if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
@@ -137,21 +130,19 @@ export const aiService = {
       return null;
     } catch (error) {
       console.error("Image Generation Error:", error);
-      return null; // Fail gracefully (Show gradient instead)
+      return null;
     }
   },
 
   // --- MAIN ANALYSIS FUNCTION ---
-  // หัวใจหลักของ App: วิเคราะห์รูปเพื่อหาคุณภาพและความเสี่ยง
   async analyzeStockPhoto(imageBlob: Blob): Promise<StockAnalysisResult | null> {
     const apiKey = process.env.API_KEY;
     if (!apiKey || apiKey === 'dummy-key-for-ui-dev' || apiKey === '') {
       console.warn("No API Key. Skipping real analysis.");
-      return null; // Triggers mock fallback
+      return null; 
     }
 
     try {
-      // Convert Blob to Base64
       const base64Data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -164,8 +155,6 @@ export const aiService = {
 
       const ai = new GoogleGenAI({ apiKey });
 
-      // [COMPLIANCE] Banned Words List
-      // รายชื่อแบรนด์ที่ห้ามมีใน Keywords เด็ดขาด เพื่อป้องกันการโดนฟ้องลิขสิทธิ์
       const BANNED_WORDS = [
         "iphone", "ipad", "macbook", "apple", "samsung", "sony", "canon", "nikon", "coca cola", "pepsi",
         "nike", "adidas", "gucci", "lv", "chanel", "starbucks", "mcdonalds",
@@ -174,61 +163,47 @@ export const aiService = {
         "bangkok hospital", "bumrungrad", "sririraj" 
       ];
 
-      // [PROMPT ENGINEERING] Multi-Phase Analysis
-      // Updated to focus on Commercial Viability (Who will buy this?)
+      // [PROMPT UPDATE] Requested by user: Detailed 5 Pros / 5 Cons
       const systemInstruction = `
-        You are a Senior Stock-Photo Editor & Commercial Strategist at a major agency (Shutterstock/Adobe Stock).
-        Your goal is to evaluate images not just for "beauty", but for **COMMERCIAL VIABILITY**.
-
-        --- PHASE 1: COMMERCIAL VALUE & USABILITY (CRITICAL) ---
-        Evaluate "Who will buy this and what for?":
-        1.  **Copy Space:** Is there a clean area for designers to place text/logos? (High value).
-        2.  **Concept Clarity:** Does it communicate a clear concept (e.g., "Remote work", "Success", "Sustainability")?
-        3.  **Versatility:** Is it generic enough to be used in multiple contexts, but specific enough to be useful?
-        4.  **Authenticity:** Does it look natural/candid (High trend) or staged/fake (Low trend)?
-
-        --- PHASE 2: TECHNICAL & AESTHETIC ---
-        - **Lighting:** Balanced exposure suitable for ads? (No harsh shadows blocking faces).
-        - **Composition:** Rule of thirds, straight horizons.
-        - **Noise/Focus:** Must be sharp at 100%.
-
-        --- PHASE 3: VISUAL RISK SCAN ---
-        - Scan for Logos/Trademarks: Even small icons on shirts, shoes, phones, cars.
-        - Scan for Identifiable People: If a face is visible, a Model Release is REQUIRED.
-
-        --- SCORING LOGIC (0-100) ---
-        - **90-100 (Best Seller):** Perfect technicals + Strong Concept + Great Copy Space + Trending Style (Authentic).
-        - **70-89 (Solid Stock):** Good technicals, clear subject, usable.
-        - **50-69 (Snapshot/Average):** Technically okay but "boring", cluttered background, no copy space, or looks too "staged".
-        - **0-49 (Reject):** Blurry, noise, heavy trademark issues, or poor lighting.
-
-        OUTPUT FORMAT: JSON ONLY.
+        You are a Senior Stock-Photo Auditor for a premium agency.
+        Your job is to provide a BRUTALLY HONEST commercial assessment.
+        
+        CRITERIA:
+        1. **Commercial Value**: Who buys this? Why? (Ads, Blogs, UI backgrounds).
+        2. **Technical Quality**: Focus, Noise, Lighting, Artifacts.
+        3. **Stock Usability**: Copy space, generic vs specific, authenticity.
+        
+        SCORING (0-100):
+        - <50: Reject (Blur, Noise, Bad Light, Trademarks).
+        - 50-70: Average (Good enough but boring or cluttered).
+        - 71-89: High Potential (Good tech, clear concept).
+        - 90+: Best Seller (Perfect tech + Strong Trend + Great Copy Space).
       `;
 
       const prompt = `
-        Analyze this image for Stock Photo commercial potential.
-        
-        1. **Assess Usability**: specifically look for 'Copy Space' and 'Background Cleanliness'.
-        2. **Assess Concept**: What is the story? (e.g. 'Business growth', 'Family love').
-        3. **Calculate Sell Score**: Be strict. A beautiful photo with no commercial use should get a LOWER score than a simple photo with great copy space.
-        4. **Score Rationale**: Explain the score based on *buying potential* (e.g., "Good for banner ads due to copy space", "Hard to use due to clutter").
-        5. **Banned Words**: Do NOT use: ${BANNED_WORDS.join(", ")}.
-        
-        Return valid JSON.
+        Analyze this image. Output JSON only.
+
+        1. **Pros (5 points)**: List EXACTLY 5 specific strong points (e.g., "Excellent copy space on top right", "Natural authentic smile", "Sharp focus on eyes").
+        2. **Cons (5 points)**: List EXACTLY 5 specific weak points or risks (e.g., "Slight noise in shadows", "Brand logo visible on shoe", "Cluttered background").
+        3. **Keywords**: 40 distinct keywords sorted by relevance.
+        4. **Score**: Calculate strictly.
+        5. **Banned Words**: Avoid ${BANNED_WORDS.join(", ")}.
       `;
 
-      // JSON Schema for Strict Output Control
       const schema = {
         type: Type.OBJECT,
         properties: {
-          title: { type: Type.STRING, description: "Commercial title, e.g., 'Happy family running on beach with copy space'" },
+          title: { type: Type.STRING },
           description: { type: Type.STRING },
-          keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exactly 40 keywords sorted by relevance" },
-          category: { type: Type.STRING, description: "One of: Animals, Architecture, Business, Food, Nature, People, Tech, Travel, General" },
-          sellScore: { type: Type.NUMBER, description: "0-100 commercial value" },
-          scoreRationale: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Reasons focused on usability and market demand" },
-          qcWarnings: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Technical rejections (Blur, Noise, Trademarks)" },
-          suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Actionable edits to increase value" },
+          keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+          category: { type: Type.STRING },
+          sellScore: { type: Type.NUMBER },
+          // [UPDATE] New Schema for Pros/Cons
+          pros: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exactly 5 strong commercial points" },
+          cons: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exactly 5 weak points or risks" },
+          
+          qcWarnings: { type: Type.ARRAY, items: { type: Type.STRING } },
+          suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
           riskFlags: {
             type: Type.OBJECT,
             properties: {
@@ -244,20 +219,15 @@ export const aiService = {
             type: Type.OBJECT,
             properties: {
               orientation: { type: Type.STRING },
-              copySpace: { type: Type.STRING, description: "None, Low, Medium, High (Critical for ads)" },
-              backgroundCleanliness: { type: Type.STRING, description: "Cluttered, Busy, Clean, Isolated" }
+              copySpace: { type: Type.STRING },
+              backgroundCleanliness: { type: Type.STRING }
             },
             required: ["orientation", "copySpace", "backgroundCleanliness"]
           }
         },
-        required: ["title", "keywords", "category", "sellScore", "riskFlags", "qcWarnings", "suggestions"]
+        required: ["title", "keywords", "category", "sellScore", "pros", "cons", "riskFlags", "qcWarnings", "suggestions"]
       };
 
-      // [FALLBACK STRATEGY] Model Cascade
-      // ลองใช้ Model ที่ดีที่สุดก่อน ถ้าพัง ให้ถอยไปใช้ Model รองลงมา
-      // 1. gemini-3-flash-preview: Best quality, low quota.
-      // 2. gemini-2.0-flash-exp: New fast model, good quota.
-      // 3. gemini-flash-latest: Stable standard (1.5 Flash).
       const modelsToTry = [
           "gemini-3-flash-preview", 
           "gemini-2.0-flash-exp",
@@ -292,12 +262,7 @@ export const aiService = {
         } catch (error: any) {
           lastError = error;
           console.debug(`Model ${model} failed, attempting switch...`, error.message);
-
-          // If this was the last model, stop and throw
-          if (model === modelsToTry[modelsToTry.length - 1]) {
-             break;
-          }
-          // Continue to next model immediately
+          if (model === modelsToTry[modelsToTry.length - 1]) break;
           continue;
         }
       }
@@ -311,8 +276,6 @@ export const aiService = {
   }
 };
 
-// [TESTING] Mock Data Fallback
-// ใช้เมื่อระบบหลักล่ม หรือไม่มี API Key
 function getMockTrends(topic?: string): TrendItem[] {
   const base = topic ? `Concept for ${topic}` : "Trending Concept";
   return Array.from({ length: 9 }).map((_, i) => ({

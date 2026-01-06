@@ -4,11 +4,92 @@ import { Catalog, Asset, AssetStatus, Analysis } from '../lib/types';
 import { Icons } from '../components/ui/Icons';
 import { MetadataPanel } from '../features/asset/components/MetadataPanel';
 
+// --- NEW COMPONENT: Detailed Score Modal ---
+const AnalysisDetailModal = ({ analysis, onClose }: { analysis: Analysis, onClose: () => void }) => {
+    const score = analysis.sellScore;
+    let scoreColor = 'text-red-500';
+    if (score > 50) { scoreColor = 'text-yellow-500'; }
+    if (score > 80) { scoreColor = 'text-green-500'; }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-surface border border-border rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative flex flex-col">
+                
+                {/* Header */}
+                <div className="p-6 border-b border-border flex justify-between items-start bg-slate-900/50">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                             <div className={`text-3xl font-bold ${scoreColor}`}>{score}/100</div>
+                             <div className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${score > 80 ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`}>
+                                {score > 80 ? 'Excellent Commercial Value' : 'Average Commercial Value'}
+                             </div>
+                        </div>
+                        <h3 className="text-xl font-bold text-white leading-tight">{analysis.title}</h3>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition"><Icons.Close /></button>
+                </div>
+
+                {/* Body: Pros & Cons Grid */}
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    {/* PROS COLUMN */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-green-400 font-bold uppercase tracking-widest text-xs mb-2">
+                            <Icons.Trending className="text-green-400" size={16}/> 5 Strong Points (Pros)
+                        </div>
+                        <ul className="space-y-3">
+                            {(analysis.pros || []).map((pro, i) => (
+                                <li key={i} className="flex gap-3 text-sm text-slate-300 bg-green-900/10 p-3 rounded border border-green-900/30">
+                                    <Icons.Check size={16} className="text-green-500 shrink-0 mt-0.5" />
+                                    <span>{pro}</span>
+                                </li>
+                            ))}
+                            {(!analysis.pros || analysis.pros.length === 0) && <div className="text-muted italic text-xs">No specific pros listed.</div>}
+                        </ul>
+                    </div>
+
+                    {/* CONS COLUMN */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-red-400 font-bold uppercase tracking-widest text-xs mb-2">
+                            <Icons.Alert className="text-red-400" size={16}/> 5 Weak Points (Risks)
+                        </div>
+                        <ul className="space-y-3">
+                            {(analysis.cons || []).map((con, i) => (
+                                <li key={i} className="flex gap-3 text-sm text-slate-300 bg-red-900/10 p-3 rounded border border-red-900/30">
+                                    <Icons.Close size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                    <span>{con}</span>
+                                </li>
+                            ))}
+                            {(!analysis.cons || analysis.cons.length === 0) && <div className="text-muted italic text-xs">No specific cons listed.</div>}
+                        </ul>
+                    </div>
+
+                </div>
+
+                {/* Footer: Suggestions */}
+                <div className="p-6 bg-slate-950/50 border-t border-border">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold uppercase tracking-widest text-xs mb-3">
+                         <Icons.Sparkles size={14}/> Editing Suggestions
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                         {analysis.suggestions.map((s, i) => (
+                             <span key={i} className="text-xs bg-blue-900/20 text-blue-200 px-3 py-1.5 rounded-full border border-blue-500/30">
+                                 {s}
+                             </span>
+                         ))}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
 // --- ANALYSIS HUD (HEAD-UP DISPLAY) ---
-// ส่วนแสดงผลคะแนนและความเสี่ยง (Risk) แบบสรุปย่อ ไว้ด้านบนสุดของหน้าจอ
-// เพื่อให้ User เห็นภาพรวมก่อนลงรายละเอียด
 const AssetAnalysisHUD = ({ analysis, isLoading }: { analysis?: Analysis, isLoading: boolean }) => {
-  // 1. Loading State (Skeleton UI)
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // 1. Loading State
   if (isLoading) {
     return (
       <div className="w-full bg-slate-900 border-b border-border p-4 flex items-center gap-4 animate-pulse">
@@ -23,90 +104,94 @@ const AssetAnalysisHUD = ({ analysis, isLoading }: { analysis?: Analysis, isLoad
   if (!analysis) return null;
 
   // 2. Score Visualization Logic
-  // เปลี่ยนสีตามเกณฑ์คะแนน (Traffic Light System)
   const score = analysis.sellScore;
   let scoreColor = 'text-red-500';
   if (score > 50) { scoreColor = 'text-yellow-500'; }
   if (score > 80) { scoreColor = 'text-green-500'; }
 
   const risks = analysis.riskFlags;
-  // [UPDATE] Get the first rationale point to display
-  const primaryRationale = analysis.scoreRationale && analysis.scoreRationale.length > 0 
-    ? analysis.scoreRationale[0] 
-    : "No rationale provided.";
+  
+  // Use the first Pro as the highlight teaser
+  const highlightTeaser = (analysis.pros && analysis.pros.length > 0) 
+      ? analysis.pros[0] 
+      : (analysis.scoreRationale?.[0] || "No data available");
   
   return (
-    <div className="w-full bg-[#0b0f19] border-b border-border p-3 shadow-md flex flex-col md:flex-row gap-4 md:items-center relative z-20">
-      
-      {/* SCORE CIRCLE & RATIONALE */}
-      {/* [UPDATE] Increased min-width to accommodate text and added flex-col layout for text */}
-      <div className="flex items-center gap-3 border-r border-border pr-6 min-w-[280px]">
-        <div className="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
-           {/* SVG Circle Progress logic using strokeDasharray */}
-           <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-              <path className="text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-              <path className={`${scoreColor} transition-all duration-1000`} strokeDasharray={`${score}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-           </svg>
-           <span className={`absolute text-xs font-bold ${scoreColor}`}>{score}</span>
+    <>
+        <div className="w-full bg-[#0b0f19] border-b border-border p-3 shadow-md flex flex-col md:flex-row gap-4 md:items-center relative z-20">
+        
+        {/* SCORE CIRCLE & SUMMARY */}
+        <div className="flex items-center gap-3 border-r border-border pr-6 min-w-[320px]">
+            <div className="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <path className="text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                <path className={`${scoreColor} transition-all duration-1000`} strokeDasharray={`${score}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+            </svg>
+            <span className={`absolute text-xs font-bold ${scoreColor}`}>{score}</span>
+            </div>
+            
+            <div className="flex flex-col justify-center flex-1 min-w-0">
+                <div className="flex justify-between items-center w-full">
+                    <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Sell Potential</div>
+                    {/* [UPDATE] SEE MORE BUTTON */}
+                    <button 
+                        onClick={() => setShowDetailModal(true)}
+                        className="text-[9px] text-primary hover:text-white underline decoration-dotted transition-colors flex items-center gap-1"
+                    >
+                        See Full Report <Icons.ChevronRight size={10}/>
+                    </button>
+                </div>
+
+                <div className={`text-xs font-bold ${scoreColor} mb-0.5`}>
+                    {score > 80 ? 'HIGH VALUE' : score > 50 ? 'AVERAGE' : 'POOR'}
+                </div>
+                
+                {/* Teaser Text */}
+                <p className="text-[10px] text-slate-400 leading-tight truncate w-full" title={highlightTeaser}>
+                    {highlightTeaser}
+                </p>
+            </div>
         </div>
-        <div className="flex flex-col justify-center">
-           <div className="text-[9px] text-muted uppercase tracking-wider font-bold">Sell Potential</div>
-           <div className={`text-xs font-bold ${scoreColor} mb-0.5`}>
-             {score > 80 ? 'HIGH VALUE' : score > 50 ? 'AVERAGE' : 'POOR'}
-           </div>
-           {/* [UPDATE] Added Rationale Text */}
-           <p className="text-[10px] text-slate-400 leading-tight line-clamp-2 max-w-[200px]" title={primaryRationale}>
-              {primaryRationale}
-           </p>
+
+        {/* RISK FLAGS (Badges) */}
+        <div className="flex-1 flex flex-wrap gap-2 items-center">
+            {/* Model Release Check */}
+            {risks.requiresModelRelease ? (
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-orange-900/20 border border-orange-500/50 text-orange-400 text-[10px] rounded-full font-medium">
+                <Icons.People size={10} /> Model Release Req
+            </span>
+            ) : (
+                analysis.category === 'People' && <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900/20 border border-green-500/50 text-green-400 text-[10px] rounded-full font-medium opacity-50"><Icons.Check size={10}/> No Release Needed</span>
+            )}
+
+            {/* Trademark/Logo Check */}
+            {risks.containsLogoOrText ? (
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-red-900/20 border border-red-500/50 text-red-400 text-[10px] rounded-full font-medium">
+                <Icons.Alert size={10} /> Logo Detected
+            </span>
+            ) : (
+                <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900/20 border border-green-500/50 text-green-400 text-[10px] rounded-full font-medium opacity-50"><Icons.Shield size={10}/> Clean (No Logos)</span>
+            )}
+
+            {/* Editorial Recommendation */}
+            {risks.editorialRecommended && (
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-900/20 border border-blue-500/50 text-blue-400 text-[10px] rounded-full font-medium">
+                <Icons.Library size={10} /> Editorial Only
+            </span>
+            )}
+            
+            {/* QC Warnings */}
+            {analysis.qcWarnings.length > 0 && (
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-yellow-900/20 border border-yellow-500/50 text-yellow-400 text-[10px] rounded-full font-medium">
+                <Icons.ShieldAlert size={10} /> {analysis.qcWarnings.length} QC Warnings
+            </span>
+            )}
         </div>
-      </div>
+        </div>
 
-      {/* RISK FLAGS (Badges) */}
-      <div className="flex-1 flex flex-wrap gap-2 items-center">
-         {/* Model Release Check */}
-         {risks.requiresModelRelease ? (
-           <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-orange-900/20 border border-orange-500/50 text-orange-400 text-[10px] rounded-full font-medium">
-             <Icons.People size={10} /> Model Release Req
-           </span>
-         ) : (
-            // Show Green badge only if category allows (People)
-            analysis.category === 'People' && <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900/20 border border-green-500/50 text-green-400 text-[10px] rounded-full font-medium opacity-50"><Icons.Check size={10}/> No Release Needed</span>
-         )}
-
-         {/* Trademark/Logo Check */}
-         {risks.containsLogoOrText ? (
-           <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-red-900/20 border border-red-500/50 text-red-400 text-[10px] rounded-full font-medium">
-             <Icons.Alert size={10} /> Logo Detected
-           </span>
-         ) : (
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-green-900/20 border border-green-500/50 text-green-400 text-[10px] rounded-full font-medium opacity-50"><Icons.Shield size={10}/> Clean (No Logos)</span>
-         )}
-
-         {/* Editorial Recommendation */}
-         {risks.editorialRecommended && (
-           <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-900/20 border border-blue-500/50 text-blue-400 text-[10px] rounded-full font-medium">
-             <Icons.Library size={10} /> Editorial Only
-           </span>
-         )}
-         
-         {/* QC Warnings (Technical issues like blur/noise) */}
-         {analysis.qcWarnings.length > 0 && (
-           <span className="flex items-center gap-1.5 px-2.5 py-0.5 bg-yellow-900/20 border border-yellow-500/50 text-yellow-400 text-[10px] rounded-full font-medium">
-             <Icons.ShieldAlert size={10} /> {analysis.qcWarnings.length} QC Warnings
-           </span>
-         )}
-      </div>
-
-      {/* Detail Text for QC Warnings (Desktop only) */}
-      {analysis.qcWarnings.length > 0 && (
-         <div className="hidden lg:flex flex-col text-[10px] text-yellow-500/80 max-w-[250px] border-l border-border pl-4">
-            {analysis.qcWarnings.slice(0,2).map((w,i) => (
-              <span key={i} className="truncate">• {w}</span>
-            ))}
-         </div>
-      )}
-
-    </div>
+        {/* MODAL PORTAL */}
+        {showDetailModal && <AnalysisDetailModal analysis={analysis} onClose={() => setShowDetailModal(false)} />}
+    </>
   );
 };
 
@@ -120,12 +205,6 @@ interface AssetThumbnailProps {
   onClick: (id: string) => void;
 }
 
-/**
- * [PERFORMANCE NOTE] React.memo
- * Component นี้จะถูก render บ่อยมาก (ทุกครั้งที่มีการ update status ของรูปใดรูปหนึ่ง)
- * การใช้ React.memo พร้อม custom comparison function
- * ช่วยป้องกันการ re-render ของรูปอื่นที่ไม่เกี่ยวข้อง ทำให้ UI ลื่นไหลแม้มีรูปเป็น 100
- */
 const AssetThumbnail = React.memo(({ asset, isSelected, isInSelectionMode, isChecked, onClick }: AssetThumbnailProps) => {
   return (
     <div 
@@ -165,12 +244,6 @@ const AssetThumbnail = React.memo(({ asset, isSelected, isInSelectionMode, isChe
     </div>
   );
 }, (prev, next) => {
-  // [CRITICAL] Re-render conditions
-  // จะ re-render ก็ต่อเมื่อ:
-  // 1. เป็นรูปคนละรูป (id เปลี่ยน)
-  // 2. Status เปลี่ยน (เช่น จาก Pending -> Processing)
-  // 3. Favorite เปลี่ยน
-  // 4. Selection State เปลี่ยน
   return (
     prev.asset.id === next.asset.id &&
     prev.asset.status === next.asset.status &&

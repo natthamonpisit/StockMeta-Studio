@@ -307,7 +307,12 @@ class MockBackend {
         keywords: analysisData.keywords,
         category: analysisData.category,
         sellScore: analysisData.sellScore,
-        scoreRationale: analysisData.scoreRationale || [],
+        scoreRationale: analysisData.scoreRationale || analysisData.pros, // Fallback
+        
+        // [UPDATE] Mock data filling
+        pros: analysisData.pros || ["Simulated Pro 1", "Simulated Pro 2"],
+        cons: analysisData.cons || ["Simulated Cons 1"],
+
         suggestions: analysisData.suggestions,
         qcWarnings: analysisData.qcWarnings || [],
         riskFlags: analysisData.riskFlags,
@@ -354,6 +359,21 @@ class MockBackend {
       category,
       sellScore: 75,
       scoreRationale: ["Simulated Score"],
+      // [UPDATE] Default pros/cons for simulation
+      pros: [
+          "Good exposure and natural lighting",
+          "Clear subject separation",
+          "Standard aspect ratio suitable for social",
+          "No visible trademarks",
+          "Sharp focus on main subject"
+      ],
+      cons: [
+          "Composition is a bit centered (static)",
+          "Background is slightly distracting",
+          "Limited copy space for text",
+          "Common subject matter (high competition)",
+          "Could benefit from color grading"
+      ],
       suggestions: ["Check white balance"],
       qcWarnings: [],
       riskFlags: {
