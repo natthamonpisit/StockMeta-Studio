@@ -4,6 +4,7 @@ import { CatalogViewerPage } from './src/pages/CatalogViewerPage';
 import { TrendsPage } from './src/pages/TrendsPage';
 import { mockBackend } from './src/lib/mockBackend';
 import { ExportTemplateId } from './src/lib/exportService';
+import { db } from './src/lib/db'; // Direct DB Access for Inspector
 
 // --- SAFE COMPONENTS (Error Handling) ---
 
@@ -209,6 +210,80 @@ const ExportPage = ({ onBack }: { onBack: () => void }) => {
   );
 }
 
+// --- SETTINGS PAGE (With Data Inspector) ---
+
+const SettingsPage = () => {
+  const [inspectorData, setInspectorData] = useState<string | null>(null);
+
+  const loadRawData = async () => {
+    try {
+      // Direct Read from IndexedDB (Bypassing App State)
+      // This confirms data is actually on disk.
+      const raw = await db.get('stockmeta_full_state');
+      if (raw) {
+        // Beautify specifically the Analyses part which contains titles/keywords
+        const analysisSample = raw.analyses.map(([, val]: any) => ({
+             id: val.assetId.substring(0, 5) + '...',
+             title: val.title,
+             keywords_count: val.keywords.length,
+             keywords_sample: val.keywords.slice(0, 5).join(', ') + '...'
+        }));
+        setInspectorData(JSON.stringify(analysisSample, null, 2));
+      } else {
+        setInspectorData("No data found in IndexedDB yet.");
+      }
+    } catch (e: any) {
+      setInspectorData("Error reading DB: " + e.message);
+    }
+  };
+
+  return (
+    <div className="p-10 text-center text-muted h-full overflow-y-auto">
+      <h3 className="text-xl font-bold text-white mb-4">Settings & Diagnostics</h3>
+      <div className="max-w-md mx-auto space-y-6">
+          
+          <div className="bg-surface p-6 rounded border border-border">
+              <h4 className="font-bold text-sm text-slate-300 mb-2">Storage Status</h4>
+              <p className="mb-4 text-xs">Database is running locally (IndexedDB).</p>
+              
+              {!inspectorData ? (
+                  <button 
+                    onClick={loadRawData}
+                    className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm w-full border border-slate-600 flex items-center justify-center gap-2"
+                  >
+                      <Icons.Search size={14}/> Inspect Local Data
+                  </button>
+              ) : (
+                  <div className="text-left">
+                      <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-bold text-green-400">RAW DATA FROM DISK</span>
+                          <button onClick={() => setInspectorData(null)} className="text-[10px] underline">Close</button>
+                      </div>
+                      <pre className="text-[10px] bg-black p-3 rounded border border-slate-700 overflow-auto max-h-60 font-mono text-green-500">
+                          {inspectorData}
+                      </pre>
+                  </div>
+              )}
+          </div>
+
+          <div className="bg-red-950/10 p-6 rounded border border-red-900/30">
+              <h4 className="font-bold text-sm text-red-400 mb-2">Danger Zone</h4>
+              <button 
+                onClick={async () => {
+                    if(confirm("Warning: This will delete ALL images and metadata. Continue?")) {
+                        await mockBackend.hardReset();
+                    }
+                }}
+                className="bg-red-900/50 hover:bg-red-900 text-red-200 px-4 py-2 rounded text-sm w-full border border-red-800 flex items-center justify-center gap-2"
+              >
+                  <Icons.Trash size={14}/> Hard Reset Database
+              </button>
+          </div>
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN APP SHELL ---
 
 enum View { TRENDS = 'TRENDS', LIBRARY = 'LIBRARY', IMPORT = 'IMPORT', VIEWER = 'VIEWER', EXPORT = 'EXPORT', SETTINGS = 'SETTINGS' }
@@ -244,24 +319,7 @@ export default function App() {
       case View.LIBRARY: return <LibraryPage onSelectCatalog={navigateToCatalog} />;
       case View.VIEWER: return activeCatalogId ? <CatalogViewerPage catalogId={activeCatalogId} onBack={() => setCurrentView(View.LIBRARY)} onNavigateExport={() => setCurrentView(View.EXPORT)} /> : <LibraryPage onSelectCatalog={navigateToCatalog} />;
       case View.EXPORT: return <ExportPage onBack={() => setCurrentView(View.LIBRARY)} />;
-      case View.SETTINGS: return (
-         <div className="p-10 text-center text-muted">
-            <h3 className="text-xl font-bold text-white mb-4">Settings</h3>
-            <div className="max-w-md mx-auto bg-surface p-6 rounded border border-border">
-                <p className="mb-4">Database is running locally in your browser (IndexedDB).</p>
-                <button 
-                  onClick={async () => {
-                      if(confirm("Warning: This will delete ALL images and metadata. Continue?")) {
-                          await mockBackend.hardReset();
-                      }
-                  }}
-                  className="bg-red-900/50 hover:bg-red-900 text-red-200 px-4 py-2 rounded text-sm w-full border border-red-800"
-                >
-                    Hard Reset Database
-                </button>
-            </div>
-         </div>
-      );
+      case View.SETTINGS: return <SettingsPage />;
       default: return <TrendsPage />;
     }
   };
