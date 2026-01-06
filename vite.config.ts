@@ -4,14 +4,23 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load environment variables
-  // Fixed: Property 'cwd' does not exist on type 'Process'
   const env = loadEnv(mode, (process as any).cwd(), '');
   
   return {
-    plugins: [react()],
+    base: './', 
+    server: {
+      host: true
+    },
+    // [FIX] Force Vite to bundle these dependencies.
+    // This prevents the "Uncaught TypeError: Failed to resolve module specifier" 
+    // and ensures the bundled React matches the version used in the app code.
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react/jsx-runtime', 'lucide-react', 'uuid', 'exifreader'],
+    },
+    plugins: [
+      react() 
+    ],
     define: {
-      // Vital: This allows process.env.API_KEY to work in the browser code
-      // It grabs the value from Vercel/System and bakes it into the build
       'process.env.API_KEY': JSON.stringify(env.API_KEY)
     }
   };
