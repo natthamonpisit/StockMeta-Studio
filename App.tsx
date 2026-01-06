@@ -107,44 +107,211 @@ const ImportPage = ({ onImportDone }: { onImportDone: (catalogId: string) => voi
   );
 };
 
-const LibraryPage = ({ onSelectCatalog }: { onSelectCatalog: (id: string) => void }) => {
-  const catalogs = mockBackend.getCatalogs();
+// [UPDATE] Rename Modal Component
+const RenameModal = ({ 
+  isOpen, 
+  currentName, 
+  onClose, 
+  onSave 
+}: { 
+  isOpen: boolean; 
+  currentName: string; 
+  onClose: () => void; 
+  onSave: (newName: string) => void; 
+}) => {
+  const [name, setName] = useState(currentName);
+
+  useEffect(() => {
+    setName(currentName);
+  }, [currentName]);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="p-8">
-      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Icons.Library /> Library</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {catalogs.map(cat => (
-          <div 
-            key={cat.id} 
-            onClick={() => onSelectCatalog(cat.id)}
-            className="bg-surface border border-border rounded-lg p-4 cursor-pointer hover:border-primary transition group relative"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-surface border border-border p-6 rounded-lg w-full max-w-sm shadow-2xl">
+        <h3 className="text-lg font-bold mb-4">Rename Catalog</h3>
+        <input 
+          autoFocus
+          className="w-full bg-slate-900 border border-border rounded p-2 mb-4 focus:border-primary focus:outline-none text-white"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+             if (e.key === 'Enter') onSave(name);
+             if (e.key === 'Escape') onClose();
+          }}
+        />
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-slate-400 hover:text-white">Cancel</button>
+          <button 
+            onClick={() => onSave(name)} 
+            className="px-3 py-1.5 bg-primary hover:bg-blue-600 text-white text-sm font-bold rounded"
           >
-            <div className="h-32 bg-slate-900 rounded mb-3 flex items-center justify-center text-muted group-hover:bg-slate-800 transition-colors">
-               <Icons.Image size={32} />
-            </div>
-            <h3 className="font-semibold truncate pr-4">{cat.name}</h3>
-            <div className="text-sm text-muted flex justify-between mt-2">
-              <span>{cat.assetCount} Images</span>
-              <span className="text-xs">{new Date(cat.createdAt).toLocaleDateString()}</span>
-            </div>
-          </div>
-        ))}
-        {catalogs.length === 0 && (
-          <div className="col-span-full text-center py-10 text-muted border border-dashed border-border rounded-lg bg-surface/50">
-            <Icons.Upload className="mx-auto mb-2 opacity-50"/>
-            <p>No catalogs found. Go to Import to start.</p>
-          </div>
-        )}
+            Save
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-const ExportPage = ({ onBack }: { onBack: () => void }) => {
+const LibraryPage = ({ 
+  onSelectCatalog,
+  onNavigateExport 
+}: { 
+  onSelectCatalog: (id: string) => void;
+  onNavigateExport: (catalogId: string) => void; 
+}) => {
+  const [catalogs, setCatalogs] = useState(mockBackend.getCatalogs());
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  
+  // Rename State
+  const [renameTarget, setRenameTarget] = useState<{id: string, name: string} | null>(null);
+
+  // Refresh catalogs when component mounts
+  useEffect(() => {
+    setCatalogs(mockBackend.getCatalogs());
+    
+    // Close menu when clicking outside
+    const handleClickOutside = () => setActiveMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    if (confirm("Are you sure you want to delete this catalog and ALL images inside?")) {
+      mockBackend.deleteCatalog(id);
+      setCatalogs(mockBackend.getCatalogs());
+    }
+  };
+
+  const handleExportShortcut = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    onNavigateExport(id);
+  };
+
+  const handleRenameInit = (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    setRenameTarget({ id, name });
+  };
+
+  const performRename = (newName: string) => {
+    if (renameTarget && newName.trim()) {
+      mockBackend.updateCatalog(renameTarget.id, { name: newName.trim() });
+      setCatalogs(mockBackend.getCatalogs());
+    }
+    setRenameTarget(null);
+  };
+
+  const handleMenuToggle = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveMenuId(activeMenuId === id ? null : id);
+  };
+
+  return (
+    <>
+      <div className="p-8 h-full overflow-y-auto">
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Icons.Library /> Library</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {catalogs.map(cat => (
+            <div 
+              key={cat.id} 
+              onClick={() => onSelectCatalog(cat.id)}
+              className="group bg-surface border border-border rounded-xl cursor-pointer hover:border-primary transition-all hover:shadow-xl hover:shadow-primary/10 relative overflow-visible"
+            >
+              {/* Thumbnail Area */}
+              <div className="aspect-video bg-slate-900 rounded-t-xl overflow-hidden relative border-b border-border/50">
+                {(cat as any).coverImage ? (
+                    <img 
+                      src={(cat as any).coverImage} 
+                      alt="Cover" 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted group-hover:bg-slate-800 transition-colors">
+                      <Icons.Image size={32} className="opacity-20" />
+                    </div>
+                )}
+                
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-60 group-hover:opacity-40 transition-opacity"></div>
+              </div>
+
+              {/* [UPDATE] Expanded Menu */}
+              <div className="absolute top-2 right-2 z-20">
+                <button 
+                    onClick={(e) => handleMenuToggle(e, cat.id)}
+                    className="p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                >
+                    <Icons.More size={16} />
+                </button>
+                
+                {activeMenuId === cat.id && (
+                    <div className="absolute top-8 right-0 bg-surface border border-border rounded shadow-xl w-40 z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-100 py-1">
+                        <button 
+                          onClick={(e) => handleRenameInit(e, cat.id, cat.name)}
+                          className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2 transition-colors"
+                        >
+                          <Icons.Sparkles size={12}/> Rename
+                        </button>
+                        <button 
+                          onClick={(e) => handleExportShortcut(e, cat.id)}
+                          className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2 transition-colors"
+                        >
+                          <Icons.Export size={12}/> Export CSV
+                        </button>
+                        <div className="h-px bg-border my-1"></div>
+                        <button 
+                          onClick={(e) => handleDelete(e, cat.id)}
+                          className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                        >
+                          <Icons.Trash size={12}/> Delete
+                        </button>
+                    </div>
+                )}
+              </div>
+
+              {/* Info Area */}
+              <div className="p-4">
+                <h3 className="font-bold truncate text-slate-200 group-hover:text-primary transition-colors mb-1">{cat.name}</h3>
+                <div className="text-xs text-muted flex justify-between items-center">
+                  <span className="bg-slate-900 px-2 py-0.5 rounded border border-border/50">{cat.assetCount} Assets</span>
+                  <span className="opacity-60">{new Date(cat.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Create New Card (Shortcut) */}
+          {catalogs.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted border border-dashed border-border rounded-xl bg-surface/30">
+              <Icons.Upload className="mx-auto mb-3 opacity-30" size={48}/>
+              <p className="font-medium text-slate-400">Your library is empty.</p>
+              <p className="text-xs text-slate-500 mt-1">Go to the Import tab to add your first batch.</p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Rename Modal Portal */}
+      <RenameModal 
+        isOpen={!!renameTarget} 
+        currentName={renameTarget?.name || ''} 
+        onClose={() => setRenameTarget(null)}
+        onSave={performRename}
+      />
+    </>
+  );
+};
+
+const ExportPage = ({ onBack, initialCatalogId }: { onBack: () => void, initialCatalogId?: string }) => {
   const [output, setOutput] = useState<string | null>(null);
   const catalogs = mockBackend.getCatalogs();
-  const [selectedCat, setSelectedCat] = useState(catalogs[0]?.id || '');
+  // [UPDATE] Use initialCatalogId if provided, otherwise default to first
+  const [selectedCat, setSelectedCat] = useState(initialCatalogId || catalogs[0]?.id || '');
   const [template, setTemplate] = useState<ExportTemplateId>('shutterstock');
 
   const handleExport = () => {
@@ -291,6 +458,8 @@ enum View { TRENDS = 'TRENDS', LIBRARY = 'LIBRARY', IMPORT = 'IMPORT', VIEWER = 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>(View.TRENDS);
   const [activeCatalogId, setActiveCatalogId] = useState<string | null>(null);
+  // [UPDATE] State for Quick Export shortcut
+  const [exportCatalogId, setExportCatalogId] = useState<string | undefined>(undefined);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
 
   // Initialize DB on App Start
@@ -311,14 +480,21 @@ export default function App() {
   ];
 
   const navigateToCatalog = (id: string) => { setActiveCatalogId(id); setCurrentView(View.VIEWER); };
+  
+  // [UPDATE] Handle Quick Export Navigation
+  const navigateToExport = (catalogId: string) => { 
+      setExportCatalogId(catalogId);
+      setCurrentView(View.EXPORT);
+  };
 
   const renderContent = () => {
     switch (currentView) {
       case View.TRENDS: return <TrendsPage />;
       case View.IMPORT: return <ImportPage onImportDone={navigateToCatalog} />;
-      case View.LIBRARY: return <LibraryPage onSelectCatalog={navigateToCatalog} />;
-      case View.VIEWER: return activeCatalogId ? <CatalogViewerPage catalogId={activeCatalogId} onBack={() => setCurrentView(View.LIBRARY)} onNavigateExport={() => setCurrentView(View.EXPORT)} /> : <LibraryPage onSelectCatalog={navigateToCatalog} />;
-      case View.EXPORT: return <ExportPage onBack={() => setCurrentView(View.LIBRARY)} />;
+      case View.LIBRARY: return <LibraryPage onSelectCatalog={navigateToCatalog} onNavigateExport={navigateToExport} />;
+      case View.VIEWER: return activeCatalogId ? <CatalogViewerPage catalogId={activeCatalogId} onBack={() => setCurrentView(View.LIBRARY)} onNavigateExport={() => { setExportCatalogId(activeCatalogId); setCurrentView(View.EXPORT); }} /> : <LibraryPage onSelectCatalog={navigateToCatalog} onNavigateExport={navigateToExport} />;
+      // [UPDATE] Pass initialCatalogId to ExportPage
+      case View.EXPORT: return <ExportPage onBack={() => setCurrentView(View.LIBRARY)} initialCatalogId={exportCatalogId} />;
       case View.SETTINGS: return <SettingsPage />;
       default: return <TrendsPage />;
     }

@@ -89,10 +89,25 @@ class MockBackend {
   // --- CATALOG OPERATIONS ---
   
   getCatalogs() {
-    return Array.from(this.catalogs.values()).map(c => ({
-      ...c,
-      assetCount: this.idxCatalogAssets.get(c.id)?.size || 0
-    }));
+    return Array.from(this.catalogs.values()).map(c => {
+      const assetSet = this.idxCatalogAssets.get(c.id);
+      let coverImage: string | undefined;
+      
+      // [UPDATE] Randomly select a cover image if assets exist
+      if (assetSet && assetSet.size > 0) {
+        const assetsArray = Array.from(assetSet);
+        // Pick a random one or the first one. Let's pick random to spice it up.
+        const randomIndex = Math.floor(Math.random() * assetsArray.length);
+        const randomId = assetsArray[randomIndex];
+        coverImage = this.assets.get(randomId)?.storageKey;
+      }
+
+      return {
+        ...c,
+        assetCount: assetSet?.size || 0,
+        coverImage // Return cover image URL
+      };
+    });
   }
 
   getCatalog(id: string) {
@@ -113,6 +128,33 @@ class MockBackend {
     this.idxCatalogAssets.set(id, new Set());
     this.save(); // Save
     return catalog;
+  }
+
+  // [UPDATE] Update Catalog (e.g., Rename)
+  updateCatalog(id: string, updates: Partial<Catalog>) {
+    const current = this.catalogs.get(id);
+    if (!current) return;
+    
+    const updated = { ...current, ...updates, updatedAt: new Date().toISOString() };
+    this.catalogs.set(id, updated);
+    this.save();
+  }
+
+  // [UPDATE] Delete Catalog
+  deleteCatalog(id: string) {
+    if (!this.catalogs.has(id)) return;
+
+    // 1. Delete all assets inside
+    const assetIds = this.idxCatalogAssets.get(id);
+    if (assetIds) {
+      this.deleteAssets(Array.from(assetIds));
+    }
+
+    // 2. Delete index and catalog
+    this.idxCatalogAssets.delete(id);
+    this.catalogs.delete(id);
+    
+    this.save();
   }
 
   // --- IMPORT PROCESS ---
