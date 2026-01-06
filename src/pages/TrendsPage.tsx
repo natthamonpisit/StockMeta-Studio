@@ -164,10 +164,11 @@ const TrendCard: React.FC<{ item: TrendItem, index: number }> = ({ item, index }
 
 export const TrendsPage = () => {
   const [trends, setTrends] = useState<TrendItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Changed: Default loading to false so user sees the start button
+  const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
-  const [currentTopic, setCurrentTopic] = useState<string>('');
-  const [periodInfo, setPeriodInfo] = useState('');
+  const [currentTopic, setCurrentTopic] = useState<string>('Market Intelligence');
+  const [periodInfo, setPeriodInfo] = useState('Stock Photo Opportunity Analysis');
   const [error, setError] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
 
@@ -217,9 +218,10 @@ export const TrendsPage = () => {
     }
   };
 
-  useEffect(() => {
-    fetchTrends();
-  }, []);
+  // Removed useEffect to prevent auto-loading
+  // useEffect(() => {
+  //   fetchTrends();
+  // }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,13 +239,13 @@ export const TrendsPage = () => {
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <div className="flex items-center gap-2 text-primary">
-                  <Icons.Sparkles size={16} className="animate-pulse" />
+                  <Icons.Sparkles size={16} className={`${loading ? 'animate-pulse' : ''}`} />
                   <span className="text-xs font-bold tracking-widest uppercase bg-primary/10 px-2 py-0.5 rounded text-primary">
                     {periodInfo}
                   </span>
                 </div>
                 {/* Status Badge */}
-                {!loading && (
+                {trends.length > 0 && (
                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isLive ? 'bg-green-900/30 border-green-700 text-green-400' : 'bg-yellow-900/30 border-yellow-700 text-yellow-400'}`}>
                      {isLive ? '● LIVE AI DATA' : '○ SIMULATION MODE'}
                    </span>
@@ -283,7 +285,7 @@ export const TrendsPage = () => {
 
       {/* Content Area */}
       <div className="flex-1 p-4 md:p-8">
-        <div className="max-w-6xl mx-auto w-full">
+        <div className="max-w-6xl mx-auto w-full h-full">
           
           {loading ? (
             <div className="h-64 flex flex-col items-center justify-center text-muted">
@@ -301,6 +303,26 @@ export const TrendsPage = () => {
               <button onClick={() => fetchTrends()} className="mt-4 px-4 py-2 bg-surface hover:bg-border rounded text-sm text-white transition">
                 Retry
               </button>
+            </div>
+          ) : trends.length === 0 ? (
+            // Start Screen / Zero State
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-8 py-10 opacity-0 animate-in fade-in zoom-in duration-500 fill-mode-forwards" style={{opacity: 1}}>
+                <div className="w-28 h-28 bg-slate-900 rounded-full flex items-center justify-center border border-border shadow-2xl shadow-primary/20 ring-4 ring-slate-800/50">
+                    <Icons.Trending size={56} className="text-primary" />
+                </div>
+                <div className="max-w-lg space-y-3">
+                    <h2 className="text-3xl font-bold text-white">Market Intelligence Hub</h2>
+                    <p className="text-slate-400 text-lg">
+                        Tap into AI-powered insights. Generate a real-time forecast for the next 3 months.
+                    </p>
+                </div>
+                <button
+                    onClick={() => fetchTrends()}
+                    className="bg-primary hover:bg-blue-600 text-white text-lg font-bold px-10 py-5 rounded-2xl shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-3 border border-white/10"
+                >
+                    <Icons.Sparkles size={24} />
+                    Start Market Analysis
+                </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
